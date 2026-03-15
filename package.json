@@ -1,0 +1,12 @@
+{
+  "name": "diario-automezzi",
+  "version": "1.0.0",
+  "description": "Diario interventi per automobili",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

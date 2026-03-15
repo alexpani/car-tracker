@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diario Automezzi</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #eff6ff;
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --danger: #ef4444;
+      --danger-light: #fef2f2;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 9999;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 38px;
+      height: 38px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .app-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+      white-space: nowrap;
+      padding: 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .app-title svg { flex-shrink: 0; }
+
+    /* ── Sync pill ── */
+    .sync-pill {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      white-space: nowrap;
+      transition: all 0.3s;
+    }
+    .sync-pill.saving { color: #d97706; border-color: #fde68a; background: #fffbeb; }
+    .sync-pill.ok     { color: #059669; border-color: #6ee7b7; background: #ecfdf5; }
+    .sync-pill.error  { color: var(--danger); border-color: #fca5a5; background: var(--danger-light); }
+    .sync-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .sync-pill.saving .sync-dot { animation: pulse 0.9s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 2px; }
+    .tab-btn {
+      padding: 18px 20px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab-btn:hover { color: var(--primary); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* ── Main ── */
+    .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .section-title { font-size: 22px; font-weight: 700; }
+    .section-subtitle { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s, color 0.15s;
+      line-height: 1;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger-outline { background: var(--danger-light); color: var(--danger); border: 1px solid #fca5a5; }
+    .btn-danger-outline:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+    .icon-btn {
+      width: 34px; height: 34px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .icon-btn:hover { background: var(--bg); color: var(--text); }
+    .icon-btn.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+    /* ── Cars grid ── */
+    .cars-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .car-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      transition: box-shadow 0.2s, transform 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+    .car-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .car-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .car-icon {
+      width: 48px; height: 48px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    .car-actions { display: flex; gap: 6px; }
+    .car-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .car-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--bg);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .car-notes { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+    .car-stats {
+      display: flex;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      margin-bottom: 14px;
+    }
+    .stat { flex: 1; text-align: center; }
+    .stat-value { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+    .btn-block { width: 100%; justify-content: center; margin-top: auto; }
+
+    /* ── Interventions filter bar ── */
+    .filter-bar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .filter-group { flex: 1; min-width: 180px; }
+    .filter-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Intervention cards ── */
+    .interventions-list { display: flex; flex-direction: column; gap: 12px; }
+    .intervention-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 56px 1fr auto;
+      gap: 20px;
+      align-items: start;
+    }
+    .int-date { text-align: center; }
+    .int-date-day { font-size: 26px; font-weight: 700; color: var(--primary); line-height: 1; }
+    .int-date-mon { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+    .int-date-yr { font-size: 11px; color: var(--muted); }
+    .int-car-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--primary-light);
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .int-desc { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .int-meta { font-size: 13px; color: var(--muted); }
+    .int-notes {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      line-height: 1.5;
+    }
+    .int-actions { display: flex; gap: 6px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 56px; margin-bottom: 14px; }
+    .empty-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .empty-text { font-size: 14px; margin-bottom: 20px; }
+
+    /* ── Forms ── */
+    .form-group { margin-bottom: 18px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    select.form-control { cursor: pointer; }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(3px);
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal-header {
+      padding: 24px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title { font-size: 17px; font-weight: 700; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 4px;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 20px 24px; }
+    .modal-footer {
+      padding: 0 24px 24px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* ── Confirm dialog ── */
+    .confirm-wrap { text-align: center; padding: 12px 0; }
+    .confirm-icon { font-size: 44px; margin-bottom: 12px; }
+    .confirm-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .confirm-text { font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .header-inner { gap: 10px; }
+      .app-title { font-size: 15px; }
+      .tab-btn { padding: 14px 12px; font-size: 13px; }
+      .sync-pill span { display: none; }   /* solo il dot su mobile */
+      .main { padding: 20px 16px; }
+      .intervention-card { grid-template-columns: 1fr; gap: 10px; }
+      .int-date { display: flex; align-items: baseline; gap: 6px; text-align: left; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Loading overlay ── -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <span>Caricamento dati…</span>
+</div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="app-title">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="3" width="15" height="13" rx="2"/>
+        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+        <circle cx="5.5" cy="18.5" r="2.5"/>
+        <circle cx="18.5" cy="18.5" r="2.5"/>
+      </svg>
+      Diario Automezzi
+    </div>
+    <nav class="tabs">
+      <button class="tab-btn active" id="tab-btn-garage" onclick="switchTab('garage')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Garage
+      </button>
+      <button class="tab-btn" id="tab-btn-interventi" onclick="switchTab('interventi')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        Interventi
+      </button>
+    </nav>
+    <!-- indicatore sincronizzazione -->
+    <div class="sync-pill" id="sync-pill">
+      <div class="sync-dot"></div>
+      <span id="sync-text">—</span>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- ── GARAGE ── -->
+  <div id="tab-garage" class="tab-panel active">
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Il mio Garage</h1>
+        <p class="section-subtitle" id="cars-subtitle"></p>
+      </div>
+      <button class="btn btn-primary" onclick="openCarModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi Auto
+      </button>
+    </div>
+    <div class="cars-grid" id="cars-grid"></div>
+  </div>
+
+  <!-- ── INTERVENTI ── -->
+  <div id="tab-interventi" class="tab-panel">
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Interventi</h1>
+        <p class="section-subtitle" id="interventions-subtitle"></p>
+      </div>
+      <button class="btn btn-primary" onclick="openInterventionModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi Intervento
+      </button>
+    </div>
+
+    <div class="filter-bar">
+      <div class="filter-group">
+        <div class="filter-label">Veicolo</div>
+        <select class="form-control" id="filter-car" onchange="renderInterventions()">
+          <option value="">Tutti i veicoli</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Cerca</div>
+        <input type="text" class="form-control" id="filter-search" placeholder="Cerca descrizione o note…" oninput="renderInterventions()">
+      </div>
+    </div>
+
+    <div class="interventions-list" id="interventions-list"></div>
+  </div>
+
+</main>
+
+<!-- ── MODAL: Auto ── -->
+<div class="modal-overlay hidden" id="car-modal" onclick="overlayClick(event,'car-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="car-modal-title">Aggiungi Auto</span>
+      <button class="modal-close" onclick="closeModal('car-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="car-form" onsubmit="saveCar(event)">
+        <input type="hidden" id="car-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Marca *</label>
+            <input type="text" class="form-control" id="car-brand" placeholder="es. Fiat" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Modello *</label>
+            <input type="text" class="form-control" id="car-model" placeholder="es. 500" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Anno</label>
+            <input type="number" class="form-control" id="car-year" placeholder="es. 2020" min="1900" max="2099">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Targa</label>
+            <input type="text" class="form-control" id="car-plate" placeholder="es. AB123CD">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Note</label>
+          <textarea class="form-control" id="car-notes" placeholder="Note aggiuntive…"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('car-modal')">Annulla</button>
+      <button class="btn btn-primary" onclick="document.getElementById('car-form').requestSubmit()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Intervento ── -->
+<div class="modal-overlay hidden" id="int-modal" onclick="overlayClick(event,'int-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="int-modal-title">Aggiungi Intervento</span>
+      <button class="modal-close" onclick="closeModal('int-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="int-form" onsubmit="saveIntervention(event)">
+        <input type="hidden" id="int-id">
+        <div class="form-group">
+          <label class="form-label">Veicolo *</label>
+          <select class="form-control" id="int-car" required>
+            <option value="">Seleziona veicolo…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrizione *</label>
+          <input type="text" class="form-control" id="int-desc" placeholder="es. Cambio olio" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data *</label>
+            <input type="date" class="form-control" id="int-date" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Chilometri</label>
+            <input type="number" class="form-control" id="int-km" placeholder="es. 50000" min="0">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Note</label>
+          <textarea class="form-control" id="int-notes" placeholder="Dettagli aggiuntivi…"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('int-modal')">Annulla</button>
+      <button class="btn btn-primary" onclick="document.getElementById('int-form').requestSubmit()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Conferma ── -->
+<div class="modal-overlay hidden" id="confirm-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-body">
+      <div class="confirm-wrap">
+        <div class="confirm-icon">⚠️</div>
+        <div class="confirm-title" id="confirm-title">Conferma eliminazione</div>
+        <div class="confirm-text" id="confirm-text"></div>
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" onclick="closeModal('confirm-modal')">Annulla</button>
+          <button class="btn btn-danger-outline" id="confirm-action-btn">Elimina</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// DATA — in-memory store + sync con server JSON
+// ════════════════════════════════════════════════
+let appData = { cars: [], interventions: [] };
+let syncTimer = null;
+
+/** Restituisce i dati dall'in-memory store (sincrono) */
+function load() { return appData; }
+
+/** Aggiorna lo store e invia al server con debounce 400 ms */
+function save(data) {
+  appData = data;
+  setSyncState('saving');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => pushData(data), 400);
+}
+
+const API_URL = 'api.php';   // ← stesso dominio/cartella dell'HTML
+
+async function fetchData() {
+  setSyncState('loading');
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    appData = await res.json();
+    setSyncState('ok');
+  } catch (err) {
+    console.error('fetchData:', err);
+    setSyncState('error');
+  }
+}
+
+async function pushData(data) {
+  try {
+    const res = await fetch(API_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setSyncState('ok');
+  } catch (err) {
+    console.error('pushData:', err);
+    setSyncState('error');
+  }
+}
+
+function setSyncState(state) {
+  const pill = document.getElementById('sync-pill');
+  const text = document.getElementById('sync-text');
+  pill.className = 'sync-pill ' + state;
+  text.textContent = {
+    loading: 'Caricamento…',
+    saving:  'Salvataggio…',
+    ok:      'Sincronizzato',
+    error:   'Errore rete'
+  }[state] ?? state;
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════
+function switchTab(name) {
+  ['garage','interventi'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+  if (name === 'interventi') { populateCarSelects(); renderInterventions(); }
+  else { renderCars(); }
+}
+
+// ════════════════════════════════════════════════
+// MODALS
+// ════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function overlayClick(e, id) { if (e.target.id === id) closeModal(id); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape')
+    ['car-modal','int-modal','confirm-modal'].forEach(closeModal);
+});
+
+function confirmDelete(title, text, onConfirm) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  document.getElementById('confirm-action-btn').onclick = () => { onConfirm(); closeModal('confirm-modal'); };
+  openModal('confirm-modal');
+}
+
+// ════════════════════════════════════════════════
+// CARS
+// ════════════════════════════════════════════════
+function renderCars() {
+  const d = load();
+  const grid = document.getElementById('cars-grid');
+  const n = d.cars.length;
+  document.getElementById('cars-subtitle').textContent =
+    n === 0 ? 'Nessun veicolo registrato'
+    : n === 1 ? '1 veicolo registrato'
+    : `${n} veicoli registrati`;
+
+  if (n === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🚘</div>
+        <div class="empty-title">Nessun veicolo nel garage</div>
+        <div class="empty-text">Aggiungi la tua prima auto per iniziare.</div>
+        <button class="btn btn-primary" onclick="openCarModal()">+ Aggiungi Auto</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = d.cars.map(car => {
+    const ints   = d.interventions.filter(i => i.carId === car.id);
+    const kms    = ints.filter(i => i.km).map(i => i.km);
+    const lastKm = kms.length ? Math.max(...kms) : null;
+    return `
+      <div class="car-card">
+        <div class="car-card-top">
+          <div class="car-icon">🚗</div>
+          <div class="car-actions">
+            <button class="icon-btn" title="Modifica" onclick="openCarModal('${car.id}')">✏️</button>
+            <button class="icon-btn danger" title="Elimina" onclick="deleteCar('${car.id}')">🗑️</button>
+          </div>
+        </div>
+        <div class="car-name">${esc(car.brand)} ${esc(car.model)}</div>
+        <div class="car-badges">
+          ${car.year  ? `<span class="badge">📅 ${car.year}</span>` : ''}
+          ${car.plate ? `<span class="badge">🔖 ${esc(car.plate.toUpperCase())}</span>` : ''}
+        </div>
+        ${car.notes ? `<div class="car-notes">${esc(car.notes)}</div>` : ''}
+        <div class="car-stats">
+          <div class="stat">
+            <div class="stat-value">${ints.length}</div>
+            <div class="stat-label">Interventi</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${lastKm !== null ? lastKm.toLocaleString('it') : '—'}</div>
+            <div class="stat-label">Ultimi km</div>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-block" onclick="viewCarInterventions('${car.id}')">
+          🔧 Vedi Interventi
+        </button>
+      </div>`;
+  }).join('');
+}
+
+function viewCarInterventions(carId) {
+  document.getElementById('filter-car').dataset.pending = carId;
+  switchTab('interventi');
+}
+
+function openCarModal(carId = null) {
+  const d   = load();
+  const car = carId ? d.cars.find(c => c.id === carId) : null;
+  document.getElementById('car-modal-title').textContent = car ? 'Modifica Auto' : 'Aggiungi Auto';
+  document.getElementById('car-id').value    = car?.id    ?? '';
+  document.getElementById('car-brand').value = car?.brand ?? '';
+  document.getElementById('car-model').value = car?.model ?? '';
+  document.getElementById('car-year').value  = car?.year  ?? '';
+  document.getElementById('car-plate').value = car?.plate ?? '';
+  document.getElementById('car-notes').value = car?.notes ?? '';
+  openModal('car-modal');
+  setTimeout(() => document.getElementById('car-brand').focus(), 80);
+}
+
+function saveCar(e) {
+  e.preventDefault();
+  const d  = load();
+  const id = document.getElementById('car-id').value;
+  const car = {
+    id:    id || uid(),
+    brand: document.getElementById('car-brand').value.trim(),
+    model: document.getElementById('car-model').value.trim(),
+    year:  document.getElementById('car-year').value  || null,
+    plate: document.getElementById('car-plate').value.trim() || null,
+    notes: document.getElementById('car-notes').value.trim() || null,
+  };
+  if (id) { d.cars[d.cars.findIndex(c => c.id === id)] = car; }
+  else     { d.cars.push(car); }
+  save(d);
+  closeModal('car-modal');
+  renderCars();
+}
+
+function deleteCar(carId) {
+  const d   = load();
+  const car = d.cars.find(c => c.id === carId);
+  const n   = d.interventions.filter(i => i.carId === carId).length;
+  confirmDelete(
+    'Elimina veicolo',
+    `Vuoi eliminare "${car.brand} ${car.model}"?` +
+      (n > 0 ? ` Verranno eliminati anche ${n} interventi.` : ''),
+    () => {
+      const d2 = load();
+      d2.cars          = d2.cars.filter(c => c.id !== carId);
+      d2.interventions = d2.interventions.filter(i => i.carId !== carId);
+      save(d2);
+      renderCars();
+      populateCarSelects();
+    }
+  );
+}
+
+// ════════════════════════════════════════════════
+// INTERVENTIONS
+// ════════════════════════════════════════════════
+function populateCarSelects() {
+  const d    = load();
+  const opts = d.cars.map(c =>
+    `<option value="${c.id}">${esc(c.brand)} ${esc(c.model)}${c.plate ? ' — ' + c.plate.toUpperCase() : ''}</option>`
+  ).join('');
+
+  // filtro — ripristina valore pending o precedente
+  const fc      = document.getElementById('filter-car');
+  const pending = fc.dataset.pending;
+  const prev    = pending || fc.value;
+  delete fc.dataset.pending;
+  fc.innerHTML = '<option value="">Tutti i veicoli</option>' + opts;
+  if (prev) fc.value = prev;
+
+  // select nel form intervento
+  const ic     = document.getElementById('int-car');
+  const icPrev = ic.value;
+  ic.innerHTML = '<option value="">Seleziona veicolo…</option>' + opts;
+  if (icPrev) ic.value = icPrev;
+}
+
+function renderInterventions() {
+  const d         = load();
+  const filterCar = document.getElementById('filter-car').value;
+  const search    = document.getElementById('filter-search').value.toLowerCase().trim();
+
+  const list = d.interventions
+    .filter(i => {
+      if (filterCar && i.carId !== filterCar) return false;
+      if (search) {
+        const hay = (i.description + ' ' + (i.notes || '')).toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const n = list.length;
+  document.getElementById('interventions-subtitle').textContent =
+    n === 0 ? 'Nessun intervento trovato'
+    : n === 1 ? '1 intervento trovato'
+    : `${n} interventi trovati`;
+
+  const el = document.getElementById('interventions-list');
+  if (list.length === 0) {
+    const filtered = filterCar || search;
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">${filtered ? '🔍' : '🔧'}</div>
+        <div class="empty-title">${filtered ? 'Nessun risultato' : 'Nessun intervento registrato'}</div>
+        <div class="empty-text">${filtered ? 'Prova a modificare i filtri.' : 'Aggiungi il primo intervento.'}</div>
+        ${!filtered ? `<button class="btn btn-primary" onclick="openInterventionModal()">+ Aggiungi Intervento</button>` : ''}
+      </div>`;
+    return;
+  }
+
+  const months = ['GEN','FEB','MAR','APR','MAG','GIU','LUG','AGO','SET','OTT','NOV','DIC'];
+  el.innerHTML = list.map(i => {
+    const car     = d.cars.find(c => c.id === i.carId);
+    const carName = car ? `${car.brand} ${car.model}` : 'Veicolo rimosso';
+    const dt      = i.date.split('-');
+    const mon     = months[parseInt(dt[1], 10) - 1];
+    return `
+      <div class="intervention-card">
+        <div class="int-date">
+          <div class="int-date-day">${dt[2]}</div>
+          <div class="int-date-mon">${mon}</div>
+          <div class="int-date-yr">${dt[0]}</div>
+        </div>
+        <div class="int-content">
+          <div class="int-car-tag">🚗 ${esc(carName)}</div>
+          <div class="int-desc">${esc(i.description)}</div>
+          <div class="int-meta">${i.km ? `📍 ${Number(i.km).toLocaleString('it')} km` : ''}</div>
+          ${i.notes ? `<div class="int-notes">${esc(i.notes)}</div>` : ''}
+        </div>
+        <div class="int-actions">
+          <button class="icon-btn" title="Modifica" onclick="openInterventionModal('${i.id}')">✏️</button>
+          <button class="icon-btn danger" title="Elimina" onclick="deleteIntervention('${i.id}')">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openInterventionModal(intId = null) {
+  const d = load();
+  if (d.cars.length === 0) {
+    alert('Aggiungi prima almeno un veicolo nel Garage.');
+    return;
+  }
+  populateCarSelects();
+  const i = intId ? d.interventions.find(x => x.id === intId) : null;
+  document.getElementById('int-modal-title').textContent = i ? 'Modifica Intervento' : 'Aggiungi Intervento';
+  document.getElementById('int-id').value    = i?.id          ?? '';
+  document.getElementById('int-desc').value  = i?.description ?? '';
+  document.getElementById('int-date').value  = i?.date        ?? new Date().toISOString().slice(0, 10);
+  document.getElementById('int-km').value    = i?.km          ?? '';
+  document.getElementById('int-notes').value = i?.notes       ?? '';
+  const carSel   = document.getElementById('int-car');
+  const filterCar = document.getElementById('filter-car').value;
+  carSel.value = i ? i.carId : (filterCar || (d.cars.length === 1 ? d.cars[0].id : ''));
+  openModal('int-modal');
+  setTimeout(() => document.getElementById('int-desc').focus(), 80);
+}
+
+function saveIntervention(e) {
+  e.preventDefault();
+  const d  = load();
+  const id = document.getElementById('int-id').value;
+  const item = {
+    id:          id || uid(),
+    carId:       document.getElementById('int-car').value,
+    description: document.getElementById('int-desc').value.trim(),
+    date:        document.getElementById('int-date').value,
+    km:          document.getElementById('int-km').value ? Number(document.getElementById('int-km').value) : null,
+    notes:       document.getElementById('int-notes').value.trim() || null,
+  };
+  if (id) { d.interventions[d.interventions.findIndex(x => x.id === id)] = item; }
+  else     { d.interventions.push(item); }
+  save(d);
+  closeModal('int-modal');
+  renderInterventions();
+  if (document.getElementById('tab-garage').classList.contains('active')) renderCars();
+}
+
+function deleteIntervention(id) {
+  const d = load();
+  const i = d.interventions.find(x => x.id === id);
+  confirmDelete(
+    'Elimina intervento',
+    `Vuoi eliminare l'intervento "${i.description}"?`,
+    () => {
+      const d2 = load();
+      d2.interventions = d2.interventions.filter(x => x.id !== id);
+      save(d2);
+      renderInterventions();
+    }
+  );
+}
+
+// ════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════
+async function init() {
+  await fetchData();
+  document.getElementById('loading-overlay').classList.add('hidden');
+  renderCars();
+  populateCarSelects();
+
+  // Auto-refresh ogni 60 s — utile con più browser aperti
+  setInterval(async () => {
+    await fetchData();
+    const active = document.querySelector('.tab-panel.active')?.id;
+    if (active === 'tab-garage') renderCars();
+    else if (active === 'tab-interventi') { populateCarSelects(); renderInterventions(); }
+  }, 60_000);
+}
+
+init();
+</script>
+</body>
+</html>
