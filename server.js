@@ -8,7 +8,7 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 
 // ── Middleware ──────────────────────────────────
 app.use(express.json());
-app.use(express.static(__dirname));   // serve index.html e asset statici
+// NB: express.static va DOPO le rotte API, altrimenti serve api.php come file grezzo
 
 // ── Helpers ─────────────────────────────────────
 function readData() {
@@ -28,20 +28,27 @@ if (!fs.existsSync(DATA_FILE)) {
 }
 
 // ── API ─────────────────────────────────────────
-// Legge tutti i dati
-app.get('/api/data', (req, res) => {
-  res.json(readData());
-});
+// Stesse rotte su /api/data e /api.php
+// (api.php è usato dall'HTML per compatibilità con hosting PHP)
 
-// Sovrascrive tutti i dati
-app.put('/api/data', (req, res) => {
+function handleGet(req, res) {
+  res.json(readData());
+}
+
+function handlePut(req, res) {
   const { cars, interventions } = req.body;
   if (!Array.isArray(cars) || !Array.isArray(interventions)) {
     return res.status(400).json({ error: 'Payload non valido' });
   }
   writeData({ cars, interventions });
   res.json({ ok: true });
-});
+}
+
+app.get(['/api/data', '/api.php'], handleGet);
+app.put(['/api/data', '/api.php'], handlePut);
+
+// ── File statici (index.html ecc.) — deve stare DOPO le rotte API ──
+app.use(express.static(__dirname));
 
 // ── Avvio ────────────────────────────────────────
 app.listen(PORT, () => {
