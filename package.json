@@ -1,6 +1,6 @@
 {
   "name": "diario-automezzi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Diario interventi per automobili",
   "main": "server.js",
   "scripts": {
